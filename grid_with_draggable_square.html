@@ -1,0 +1,133 @@
+<script src="https://unpkg.com/vue"></script>
+
+<div id="territorial" style="width:400.5px;height:400.5px">
+  <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" >
+    <defs>
+      <pattern id="smallGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="gray" stroke-width="0.5"/>
+      </pattern>
+      <pattern id="grid" width="200" height="200" patternUnits="userSpaceOnUse">
+        <rect width="200" height="200" fill="url(#smallGrid)"/>
+        <path d="M 200 0 L 0 0 0 200" fill="none" stroke="gray" stroke-width="1"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#grid)" />
+    <rect class="pointer" v-bind="rectanglePos" @mousedown="startMove" @touchstart.prevent="startMove" />
+  </svg>
+</div>
+
+<script>
+
+  var app = new Vue({
+    el: '#territorial',
+
+    data: {
+      rectanglePos: {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 20
+      },
+      graphSize: 100
+    },
+
+    computed: {
+      graphPos() {
+        var size = this.graphSize
+        var half = size / 2
+        return {
+          viewBox: [-half, -half, size, size].join(" "),
+          width: size
+        }
+      },
+    },
+
+    methods: {
+
+      // Move the rectangle
+      startMove(evt) {
+        const touch = (evt.type === "touchstart")
+        if (!touch && evt.button !== 0) return;
+        const events = touch ? {
+          move: "touchmove",
+          stop: "touchend"
+        } : {
+          move: "mousemove",
+          stop: "mouseup"
+        }
+        const elem = evt.currentTarget.closest("svg")
+        const point = elem.createSVGPoint()
+        const transform = elem.getScreenCTM().inverse()
+        const rectanglePos = this.rectanglePos
+        const getPos = touch ? getTouchPos : getMousePos
+        var moving = true
+        var stopped = false
+        var newPt
+        const updateFn = () => {
+          if (moving) requestAnimationFrame(updateFn)
+          newPt = point.matrixTransform(transform)
+          rectanglePos.x = newPt.x - rectanglePos.width / 2
+          rectanglePos.y = newPt.y - rectanglePos.height / 2
+
+          // Snap the rectangle
+          if (stopped) {
+            var res_x = rectanglePos.x % rectanglePos.width;
+            var res_y = rectanglePos.y % rectanglePos.height;
+            if (res_x > rectanglePos.width / 2) {
+              res_x = res_x - rectanglePos.width
+            }
+            if (res_y > rectanglePos.height / 2) {
+              res_y = res_y - rectanglePos.height
+            }
+            rectanglePos.x = rectanglePos.x - res_x;
+            rectanglePos.y = rectanglePos.y - res_y;
+          }
+        }
+        const moveFn = (evt) => getPos(evt, point)
+        const stopFn = (evt) => {
+
+          // Remove the event listeners
+          moving = false
+          elem.removeEventListener(events.move, moveFn)
+          elem.removeEventListener(events.stop, stopFn)   
+
+          // Set to stopped 
+          stopped = true
+        }
+        requestAnimationFrame(updateFn)
+        moveFn(evt)
+
+        // Add the listeners
+        elem.addEventListener(events.move, moveFn)
+        elem.addEventListener(events.stop, stopFn)
+      }
+    }
+  })
+
+  function getMousePos(mouseEvent, point) {
+    point.x = (mouseEvent.clientX)
+    point.y = (mouseEvent.clientY)
+  }
+
+  function getTouchPos(touchEvent, point) {
+    point.x = (touchEvent.touches[0].clientX)
+    point.y = (touchEvent.touches[0].clientY)
+  }
+
+</script>
+
+<style>
+
+#territorial {
+  width: @width;
+  margin: 0 auto;
+}
+
+.pointer {
+  fill: #42b983;
+  cursor: pointer;
+}
+
+</style>
+
+
